@@ -4,14 +4,13 @@ import pandas as pd
 def get_abschluesse_nach_alter():
     query = """
         SELECT TO_CHAR(abschlussdatum::date, 'YYYY-MM') AS month,
-               alter_beim_eintritt AS category_name,
+               COALESCE(alter_beim_eintritt, 'Unbekannt') AS category_name,
                SUM(CAST(anzahl_tage AS INTEGER)) AS total_days
         FROM deals
         WHERE abschlussdatum IS NOT NULL
-          AND alter_beim_eintritt IS NOT NULL
           AND anzahl_tage IS NOT NULL
           AND abschlussdatum::date >= CURRENT_DATE - INTERVAL '2 years'
-        GROUP BY month, alter_beim_eintritt
+        GROUP BY month, category_name
         ORDER BY month;
     """
     conn = get_connection()

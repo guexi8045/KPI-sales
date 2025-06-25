@@ -7,8 +7,7 @@ def get_absagegruende():
                absagegrund AS category_name,
                COUNT(*) AS num_deals
         FROM deals
-        WHERE absagegrund IS NOT NULL
-          AND absagedatum IS NOT NULL
+        WHERE absagedatum IS NOT NULL
           AND absagedatum::date >= CURRENT_DATE - INTERVAL '2 years'
         GROUP BY month, absagegrund
         ORDER BY month;

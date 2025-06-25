@@ -7,8 +7,7 @@ def get_kuendigungen_nach_standort():
                standort AS category_name,
                COUNT(*) AS num_deals
         FROM mutationen
-        WHERE kuendigungsgrund IS NOT NULL
-          AND kuendigungsgrund != 'KIGA'
+        WHERE kuendigungsgrund != 'KIGA'
           AND abschlussdatum IS NOT NULL
           AND abschlussdatum::date >= CURRENT_DATE - INTERVAL '2 years'
         GROUP BY month, standort
