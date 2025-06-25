@@ -68,7 +68,7 @@ markupsafe==3.0.2
     #   werkzeug
 matplotlib==3.10.3
     # via -r requirements.in
-numpy==2.3.1
+numpy==1.26.4
     # via
     #   contourpy
     #   matplotlib
