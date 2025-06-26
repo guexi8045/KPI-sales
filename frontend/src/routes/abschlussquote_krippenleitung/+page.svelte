@@ -29,7 +29,7 @@
 
   const TOTAL_LABEL = 'Total';
   const TOTAL_COLOR = '#000000';
-  const endpoint = 'http://127.0.0.1:5000/api/abschlussquote_krippenleitung_roh';
+  const endpoint = '/api/abschlussquote_krippenleitung_roh';
 
   const fixedColors: string[] = [
     '#1f77b4', '#ff7f0e', '#2ca02c', '#d62728',

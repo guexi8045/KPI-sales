@@ -5,7 +5,7 @@
   let error = '';
 
   async function handleLogin() {
-    const res = await fetch('http://localhost:5000/api/login', {
+    const res = await fetch('/api/login', {  // 🔧 ohne localhost
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username, password })

@@ -7,6 +7,7 @@
     "jspdf": "^3.0.1"
   },
   "devDependencies": {
+    "@sveltejs/adapter-static": "^3.0.8",
     "@types/file-saver": "^2.0.7"
   }
 }

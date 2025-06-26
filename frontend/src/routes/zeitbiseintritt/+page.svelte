@@ -3,7 +3,8 @@
 </script>
 
 <ReportPage
-  endpoint="http://127.0.0.1:5000/api/zeitbiseintritt"
+  endpoint="
+  /api/zeitbiseintritt"
   title="Ø Tage zwischen Abschluss und Eintritt"
   valueKey="num_deals"
 />

@@ -7,7 +7,7 @@
 
   async function fetchData() {
     const token = localStorage.getItem('token');
-    const res = await fetch('http://127.0.0.1:5000/api/datenbereinigung_p1mutationen', {
+    const res = await fetch('/api/datenbereinigung_p1mutationen', {
       headers: { Authorization: `Bearer ${token}` }
     });
 

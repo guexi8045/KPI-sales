@@ -7,7 +7,7 @@
 
   async function fetchData() {
     const token = localStorage.getItem('token');
-    const res = await fetch('http://127.0.0.1:5000/api/datenbereinigung_p1deals', {
+    const res = await fetch('/api/datenbereinigung_p1deals', {
       headers: { Authorization: `Bearer ${token}` }
     });
 
