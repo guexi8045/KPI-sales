@@ -49,6 +49,8 @@ gevent==25.5.1
     # via cors
 greenlet==3.2.3
     # via gevent
+gunicorn==23.0.0
+    # via -r requirements.in
 idna==3.10
     # via
     #   requests

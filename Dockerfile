@@ -34,4 +34,5 @@ ENV FLASK_ENV=production
 
 EXPOSE 5000
 ENV PYTHONUNBUFFERED=1
-CMD ["flask", "run", "--host=0.0.0.0", "--port=5000"]
+CMD ["gunicorn", "app:app", "--bind", "0.0.0.0:5000", "--workers", "4"]
+
