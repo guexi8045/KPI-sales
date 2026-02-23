@@ -2,86 +2,182 @@
   import { onMount } from "svelte";
 
   type Row = {
-    id: number | string;
-    month: string; // Abschluss-Monat (YYYY-MM)
-    abschlussdatum: string; // YYYY-MM-DD
-    eintrittsdatum: string; // YYYY-MM-DD
-    anzahl_tage: number;
+    id: number;
+    status?: string;
+    abschlussdatum: string;
+    eintrittsdatum: string;
+    eintritt_month?: string;
+    tage_bis_eintritt?: number | null;
+    alter_beim_eintritt?: string | null;
+    notitzen_subventionen?: string | null;
+    anzahl_tage?: number | null;
+    besichtigungsstandort?: string | null;
   };
 
+  let selectedMonth = "";
   let rows: Row[] = [];
-  let loading = true;
+  let loading = false;
   let error: string | null = null;
 
-  let grouped: Record<string, Row[]> = {};
-  let months: string[] = [];
+  // Optional: Filter (wenn du sie nicht willst, kannst du den Block löschen)
+  let filterBaby = true;
+  let filterKleinkind = true;
+  let filterUnbekannt = true;
 
-  function groupByMonth(data: Row[]) {
-    const g: Record<string, Row[]> = {};
-    for (const r of data) {
-      (g[r.month] ||= []).push(r);
-    }
-    // innerhalb des Monats sortieren
-    for (const m of Object.keys(g)) {
-      g[m].sort((a, b) =>
-        (a.abschlussdatum ?? "").localeCompare(b.abschlussdatum ?? "") ||
-        (a.eintrittsdatum ?? "").localeCompare(b.eintrittsdatum ?? "") ||
-        String(a.id).localeCompare(String(b.id))
-      );
-    }
-    return g;
+  function getCurrentMonth() {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, "0");
+    return `${year}-${month}`;
   }
 
-  onMount(async () => {
-    try {
-      const res = await fetch("/api/zeitbiseintritt", { credentials: "include" });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      rows = await res.json();
+  async function load() {
+    if (!selectedMonth) return;
 
-      grouped = groupByMonth(rows);
-      months = Object.keys(grouped).sort((a, b) => a.localeCompare(b));
+    loading = true;
+    error = null;
+
+    try {
+      const res = await fetch(`/api/zeitbiseintritt?month=${selectedMonth}`);
+      if (!res.ok) throw new Error(await res.text());
+      rows = await res.json();
     } catch (e: any) {
-      error = e?.message ?? "Fehler beim Laden";
+      error = e?.message ?? String(e);
+      rows = [];
     } finally {
       loading = false;
     }
+  }
+
+  function groupByEintrittMonth(items: Row[]) {
+    const map = new Map<string, Row[]>();
+    for (const r of items) {
+      const key = r.eintritt_month ?? "Unbekannt";
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(r);
+    }
+    return Array.from(map.entries());
+  }
+
+  function subventionLabel(v: any) {
+    if (!v) return "Nein";
+    return "Ja";
+  }
+
+  function normalizeAlter(v: any) {
+    const s = (v ?? "").toString().trim();
+    if (!s) return "Unbekannt";
+    return s;
+  }
+
+  function passAlterFilter(r: Row) {
+    const a = normalizeAlter(r.alter_beim_eintritt).toLowerCase();
+    const isBaby = a.includes("baby");
+    const isKleinkind = a.includes("kleinkind");
+    const isUnbekannt = !isBaby && !isKleinkind;
+
+    return (
+      (filterBaby && isBaby) ||
+      (filterKleinkind && isKleinkind) ||
+      (filterUnbekannt && isUnbekannt)
+    );
+  }
+
+  function filteredRows() {
+    return rows.filter(passAlterFilter);
+  }
+
+  onMount(() => {
+    selectedMonth = getCurrentMonth();
+    load();
   });
 </script>
 
-<h1>Abschlussmonat → zugehörige Eintrittsdaten</h1>
-<p style="margin-top: 0.25rem; opacity: 0.8;">
-  Gruppiert nach Abschlussdatum (YYYY-MM). Pro Deal siehst du Abschluss- und Eintrittsdatum.
+<h1>Zeit bis Eintritt</h1>
+<p>
+  Wähle einen <strong>Abschlussmonat</strong> und sieh alle <strong>WON</strong>-Abschlüsse inkl. Eintrittsmonat und
+  Details. Gruppiert nach Eintrittsmonat.
 </p>
 
-{#if loading}
-  <p>Lade…</p>
-{:else if error}
-  <p style="color: red">{error}</p>
-{:else if months.length === 0}
-  <p>Keine Daten gefunden.</p>
-{:else}
-  {#each months as m}
-    <h2 style="margin-top: 1.5rem;">{m}</h2>
+<div style="display:flex; gap:12px; align-items:end; margin: 12px 0; flex-wrap: wrap;">
+  <label>
+    Abschlussmonat:
+    <input type="month" bind:value={selectedMonth} />
+  </label>
 
-    <table style="width: 100%; border-collapse: collapse;">
-      <thead>
-        <tr>
-          <th style="text-align:left; padding: 6px; border-bottom: 1px solid #ddd;">Deal ID</th>
-          <th style="text-align:left; padding: 6px; border-bottom: 1px solid #ddd;">Abschlussdatum</th>
-          <th style="text-align:left; padding: 6px; border-bottom: 1px solid #ddd;">Eintrittsdatum</th>
-          <th style="text-align:left; padding: 6px; border-bottom: 1px solid #ddd;">Tage bis Eintritt</th>
-        </tr>
-      </thead>
-      <tbody>
-        {#each grouped[m] as r}
+  <button on:click={load} disabled={loading || !selectedMonth}>
+    {loading ? "Lade…" : "Anzeigen"}
+  </button>
+
+  <div style="display:flex; gap:12px; align-items:center;">
+    <label><input type="checkbox" bind:checked={filterBaby} /> Baby</label>
+    <label><input type="checkbox" bind:checked={filterKleinkind} /> Kleinkind</label>
+    <label><input type="checkbox" bind:checked={filterUnbekannt} /> Unbekannt</label>
+  </div>
+</div>
+
+{#if error}
+  <p style="color:red; white-space: pre-wrap;">{error}</p>
+{/if}
+
+{#if !loading}
+  <p style="margin: 8px 0;">
+    <strong>Anzahl Deals:</strong> {filteredRows().length}
+  </p>
+{/if}
+
+{#if !loading && filteredRows().length === 0}
+  <p>Keine WON-Abschlüsse im gewählten Monat (oder Filter schließt alles aus).</p>
+{/if}
+
+{#if filteredRows().length > 0}
+  {#each groupByEintrittMonth(filteredRows()) as [eintrittMonth, grp]}
+    <h3 style="margin-top:16px;">Eintritt: {eintrittMonth} ({grp.length})</h3>
+
+    <div style="overflow:auto;">
+      <table style="width:100%; border-collapse: collapse; min-width: 980px;">
+        <thead>
           <tr>
-            <td style="padding: 6px; border-bottom: 1px solid #f0f0f0;">{r.id}</td>
-            <td style="padding: 6px; border-bottom: 1px solid #f0f0f0;">{r.abschlussdatum}</td>
-            <td style="padding: 6px; border-bottom: 1px solid #f0f0f0;">{r.eintrittsdatum}</td>
-            <td style="padding: 6px; border-bottom: 1px solid #f0f0f0;">{r.anzahl_tage}</td>
+            <th style="text-align:left; border-bottom:1px solid #ddd; padding:6px;">Deal-ID</th>
+            <th style="text-align:left; border-bottom:1px solid #ddd; padding:6px;">Abschluss</th>
+            <th style="text-align:left; border-bottom:1px solid #ddd; padding:6px;">Eintritt</th>
+            <th style="text-align:left; border-bottom:1px solid #ddd; padding:6px;">Tage bis Eintritt</th>
+            <th style="text-align:left; border-bottom:1px solid #ddd; padding:6px;">Alter</th>
+            <th style="text-align:left; border-bottom:1px solid #ddd; padding:6px;">Subvention</th>
+            <th style="text-align:left; border-bottom:1px solid #ddd; padding:6px;">Anzahl Tage</th>
+            <th style="text-align:left; border-bottom:1px solid #ddd; padding:6px;">Standort</th>
           </tr>
-        {/each}
-      </tbody>
-    </table>
+        </thead>
+
+        <tbody>
+          {#each grp as r}
+            <tr>
+              <td style="border-bottom:1px solid #f0f0f0; padding:6px;">{r.id}</td>
+              <td style="border-bottom:1px solid #f0f0f0; padding:6px;">{r.abschlussdatum}</td>
+              <td style="border-bottom:1px solid #f0f0f0; padding:6px;">{r.eintrittsdatum}</td>
+              <td style="border-bottom:1px solid #f0f0f0; padding:6px;">{r.tage_bis_eintritt ?? ""}</td>
+              <td style="border-bottom:1px solid #f0f0f0; padding:6px;">
+                {normalizeAlter(r.alter_beim_eintritt)}
+              </td>
+              <td style="border-bottom:1px solid #f0f0f0; padding:6px;">
+                {subventionLabel(r.notitzen_subventionen)}
+              </td>
+              <td style="border-bottom:1px solid #f0f0f0; padding:6px;">{r.anzahl_tage ?? ""}</td>
+              <td style="border-bottom:1px solid #f0f0f0; padding:6px;">
+                {r.besichtigungsstandort ?? ""}
+              </td>
+            </tr>
+
+            {#if r.notitzen_subventionen}
+              <tr>
+                <td colspan="8" style="padding:6px; border-bottom:1px solid #f0f0f0; font-size: 0.95em;">
+                  <strong>Subventions-Notiz:</strong> {r.notitzen_subventionen}
+                </td>
+              </tr>
+            {/if}
+          {/each}
+        </tbody>
+      </table>
+    </div>
   {/each}
 {/if}
