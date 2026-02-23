@@ -1,17 +1,24 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import { goto } from "$app/navigation";
 
   type Row = {
     id: number;
     status?: string;
     abschlussdatum: string;
     eintrittsdatum: string;
-    eintritt_month?: string;
+    eintritt_month?: string | null;
     tage_bis_eintritt?: number | null;
     alter_beim_eintritt?: string | null;
-    notitzen_subventionen?: string | null;
+
+    // ✅ neu: kommt aus deals.finanzierung (Subventioniert/Privat/noch unklar/Unbekannt)
+    finanzierung?: string | null;
+
     anzahl_tage?: number | null;
     besichtigungsstandort?: string | null;
+
+    // optional behalten falls du es später brauchst
+    notitzen_subventionen?: string | null;
   };
 
   let selectedMonth = "";
@@ -19,7 +26,7 @@
   let loading = false;
   let error: string | null = null;
 
-  // Optional: Filter (wenn du sie nicht willst, kannst du den Block löschen)
+  // Filter
   let filterBaby = true;
   let filterKleinkind = true;
   let filterUnbekannt = true;
@@ -29,39 +36,6 @@
     const year = now.getFullYear();
     const month = String(now.getMonth() + 1).padStart(2, "0");
     return `${year}-${month}`;
-  }
-
-  async function load() {
-    if (!selectedMonth) return;
-
-    loading = true;
-    error = null;
-
-    try {
-      const res = await fetch(`/api/zeitbiseintritt?month=${selectedMonth}`);
-      if (!res.ok) throw new Error(await res.text());
-      rows = await res.json();
-    } catch (e: any) {
-      error = e?.message ?? String(e);
-      rows = [];
-    } finally {
-      loading = false;
-    }
-  }
-
-  function groupByEintrittMonth(items: Row[]) {
-    const map = new Map<string, Row[]>();
-    for (const r of items) {
-      const key = r.eintritt_month ?? "Unbekannt";
-      if (!map.has(key)) map.set(key, []);
-      map.get(key)!.push(r);
-    }
-    return Array.from(map.entries());
-  }
-
-  function subventionLabel(v: any) {
-    if (!v) return "Nein";
-    return "Ja";
   }
 
   function normalizeAlter(v: any) {
@@ -83,8 +57,80 @@
     );
   }
 
-  function filteredRows() {
-    return rows.filter(passAlterFilter);
+  // reaktiv gefilterte Zeilen
+  $: filtered = rows.filter(passAlterFilter);
+
+  function getEintrittMonth(r: Row) {
+    const m = (r.eintritt_month ?? "").toString().trim();
+    return m ? m : "Unbekannt";
+  }
+
+  function groupByEintrittMonth(items: Row[]) {
+    const map = new Map<string, Row[]>();
+    for (const r of items) {
+      const key = getEintrittMonth(r);
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(r);
+    }
+    return Array.from(map.entries()).sort((a, b) => a[0].localeCompare(b[0]));
+  }
+
+  // reaktiv gruppiert
+  $: groups = groupByEintrittMonth(filtered);
+
+  // ✅ FIX: Subvention anhand finanzierung korrekt anzeigen
+  // Erwartete Werte: "Subventioniert", "Privat", "noch unklar", "(Keine)", "Unbekannt" etc.
+  function subventionLabel(v: any) {
+    const s = (v ?? "").toString().trim();
+
+    if (!s) return "Unbekannt";
+
+    const lower = s.toLowerCase();
+    if (lower === "(keine)" || lower === "keine") return "Unbekannt";
+    if (lower.includes("subvention")) return "Subventioniert";
+    if (lower.includes("privat")) return "Privat";
+    if (lower.includes("unklar")) return "Noch unklar";
+    if (lower.includes("unbekannt")) return "Unbekannt";
+
+    // fallback: Original anzeigen
+    return s;
+  }
+
+  async function load() {
+    if (!selectedMonth) return;
+
+    loading = true;
+    error = null;
+
+    try {
+      const token = localStorage.getItem("token");
+
+      const res = await fetch(`/api/zeitbiseintritt?month=${selectedMonth}`, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+
+      if (res.status === 401) {
+        alert("Session abgelaufen. Bitte erneut einloggen.");
+        localStorage.removeItem("token");
+        goto("/login");
+        return;
+      }
+
+      if (!res.ok) {
+        const txt = await res.text();
+        throw new Error(txt || `HTTP ${res.status}`);
+      }
+
+      const data = await res.json();
+      rows = Array.isArray(data) ? data : [];
+    } catch (e: any) {
+      error = e?.message ?? String(e);
+      rows = [];
+    } finally {
+      loading = false;
+    }
   }
 
   onMount(() => {
@@ -122,16 +168,16 @@
 
 {#if !loading}
   <p style="margin: 8px 0;">
-    <strong>Anzahl Deals:</strong> {filteredRows().length}
+    <strong>Anzahl Deals:</strong> {filtered.length}
   </p>
 {/if}
 
-{#if !loading && filteredRows().length === 0}
+{#if !loading && filtered.length === 0}
   <p>Keine WON-Abschlüsse im gewählten Monat (oder Filter schließt alles aus).</p>
 {/if}
 
-{#if filteredRows().length > 0}
-  {#each groupByEintrittMonth(filteredRows()) as [eintrittMonth, grp]}
+{#if filtered.length > 0}
+  {#each groups as [eintrittMonth, grp]}
     <h3 style="margin-top:16px;">Eintritt: {eintrittMonth} ({grp.length})</h3>
 
     <div style="overflow:auto;">
@@ -143,7 +189,7 @@
             <th style="text-align:left; border-bottom:1px solid #ddd; padding:6px;">Eintritt</th>
             <th style="text-align:left; border-bottom:1px solid #ddd; padding:6px;">Tage bis Eintritt</th>
             <th style="text-align:left; border-bottom:1px solid #ddd; padding:6px;">Alter</th>
-            <th style="text-align:left; border-bottom:1px solid #ddd; padding:6px;">Subvention</th>
+            <th style="text-align:left; border-bottom:1px solid #ddd; padding:6px;">Finanzierung</th>
             <th style="text-align:left; border-bottom:1px solid #ddd; padding:6px;">Anzahl Tage</th>
             <th style="text-align:left; border-bottom:1px solid #ddd; padding:6px;">Standort</th>
           </tr>
@@ -156,16 +202,12 @@
               <td style="border-bottom:1px solid #f0f0f0; padding:6px;">{r.abschlussdatum}</td>
               <td style="border-bottom:1px solid #f0f0f0; padding:6px;">{r.eintrittsdatum}</td>
               <td style="border-bottom:1px solid #f0f0f0; padding:6px;">{r.tage_bis_eintritt ?? ""}</td>
+              <td style="border-bottom:1px solid #f0f0f0; padding:6px;">{normalizeAlter(r.alter_beim_eintritt)}</td>
               <td style="border-bottom:1px solid #f0f0f0; padding:6px;">
-                {normalizeAlter(r.alter_beim_eintritt)}
-              </td>
-              <td style="border-bottom:1px solid #f0f0f0; padding:6px;">
-                {subventionLabel(r.notitzen_subventionen)}
+                {subventionLabel(r.finanzierung)}
               </td>
               <td style="border-bottom:1px solid #f0f0f0; padding:6px;">{r.anzahl_tage ?? ""}</td>
-              <td style="border-bottom:1px solid #f0f0f0; padding:6px;">
-                {r.besichtigungsstandort ?? ""}
-              </td>
+              <td style="border-bottom:1px solid #f0f0f0; padding:6px;">{r.besichtigungsstandort ?? ""}</td>
             </tr>
 
             {#if r.notitzen_subventionen}
