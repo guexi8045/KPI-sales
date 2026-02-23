@@ -21,7 +21,7 @@ def get_zeitbiseintritt(abschluss_month: str):
             TO_CHAR(date_trunc('month', eintrittsdatum::date), 'YYYY-MM') AS eintritt_month,
             (eintrittsdatum::date - abschlussdatum::date) AS tage_bis_eintritt,
             alter_beim_eintritt,
-            notitzen_subventionen,
+            finanzierung,
             anzahl_tage,
             besichtigungsstandort
         FROM deals
