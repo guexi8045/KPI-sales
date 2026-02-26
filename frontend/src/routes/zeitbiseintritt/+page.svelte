@@ -10,15 +10,9 @@
     eintritt_month?: string | null;
     tage_bis_eintritt?: number | null;
     alter_beim_eintritt?: string | null;
-
-    // ✅ neu: kommt aus deals.finanzierung (Subventioniert/Privat/noch unklar/Unbekannt)
     finanzierung?: string | null;
-
     anzahl_tage?: number | null;
     besichtigungsstandort?: string | null;
-
-    // optional behalten falls du es später brauchst
-    notitzen_subventionen?: string | null;
   };
 
   let selectedMonth = "";
@@ -26,7 +20,6 @@
   let loading = false;
   let error: string | null = null;
 
-  // Filter
   let filterBaby = true;
   let filterKleinkind = true;
   let filterUnbekannt = true;
@@ -57,7 +50,6 @@
     );
   }
 
-  // reaktiv gefilterte Zeilen
   $: filtered = rows.filter(passAlterFilter);
 
   function getEintrittMonth(r: Row) {
@@ -75,25 +67,19 @@
     return Array.from(map.entries()).sort((a, b) => a[0].localeCompare(b[0]));
   }
 
-  // reaktiv gruppiert
   $: groups = groupByEintrittMonth(filtered);
 
-  // ✅ FIX: Subvention anhand finanzierung korrekt anzeigen
-  // Erwartete Werte: "Subventioniert", "Privat", "noch unklar", "(Keine)", "Unbekannt" etc.
-  function subventionLabel(v: any) {
+  function finanzierungLabel(v: any) {
     const s = (v ?? "").toString().trim();
-
     if (!s) return "Unbekannt";
-
-    const lower = s.toLowerCase();
-    if (lower === "(keine)" || lower === "keine") return "Unbekannt";
-    if (lower.includes("subvention")) return "Subventioniert";
-    if (lower.includes("privat")) return "Privat";
-    if (lower.includes("unklar")) return "Noch unklar";
-    if (lower.includes("unbekannt")) return "Unbekannt";
-
-    // fallback: Original anzeigen
     return s;
+  }
+
+  function plaetze(v: any) {
+    const n = Number(v);
+    if (!Number.isFinite(n) || n <= 0) return "";
+    const p = n / 5;
+    return p % 1 === 0 ? String(p) : p.toFixed(1);
   }
 
   async function load() {
@@ -106,9 +92,7 @@
       const token = localStorage.getItem("token");
 
       const res = await fetch(`/api/zeitbiseintritt?month=${selectedMonth}`, {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
+        headers: { Authorization: `Bearer ${token}` }
       });
 
       if (res.status === 401) {
@@ -139,13 +123,55 @@
   });
 </script>
 
+<style>
+  .controls {
+    display: flex;
+    gap: 12px;
+    align-items: end;
+    margin: 12px 0;
+    flex-wrap: wrap;
+  }
+
+  .tableWrap {
+    overflow: auto;
+  }
+
+  table.report {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 980px;
+    table-layout: fixed;
+  }
+
+  table.report th,
+  table.report td {
+    border-bottom: 1px solid #f0f0f0;
+    padding: 8px;
+    vertical-align: middle;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  table.report th {
+    border-bottom: 1px solid #ddd;
+    text-align: left;
+  }
+
+  /* ✅ Zahlen mittig */
+  .center-num {
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+  }
+</style>
+
 <h1>Zeit bis Eintritt</h1>
 <p>
-  Wähle einen <strong>Abschlussmonat</strong> und sieh alle <strong>WON</strong>-Abschlüsse inkl. Eintrittsmonat und
-  Details. Gruppiert nach Eintrittsmonat.
+  Wähle einen <strong>Abschlussmonat</strong> und sieh alle <strong>WON</strong>-Abschlüsse inkl.
+  Eintrittsmonat und Details. Gruppiert nach Eintrittsmonat.
 </p>
 
-<div style="display:flex; gap:12px; align-items:end; margin: 12px 0; flex-wrap: wrap;">
+<div class="controls">
   <label>
     Abschlussmonat:
     <input type="month" bind:value={selectedMonth} />
@@ -180,43 +206,33 @@
   {#each groups as [eintrittMonth, grp]}
     <h3 style="margin-top:16px;">Eintritt: {eintrittMonth} ({grp.length})</h3>
 
-    <div style="overflow:auto;">
-      <table style="width:100%; border-collapse: collapse; min-width: 980px;">
+    <div class="tableWrap">
+      <table class="report">
         <thead>
           <tr>
-            <th style="text-align:left; border-bottom:1px solid #ddd; padding:6px;">Deal-ID</th>
-            <th style="text-align:left; border-bottom:1px solid #ddd; padding:6px;">Abschluss</th>
-            <th style="text-align:left; border-bottom:1px solid #ddd; padding:6px;">Eintritt</th>
-            <th style="text-align:left; border-bottom:1px solid #ddd; padding:6px;">Tage bis Eintritt</th>
-            <th style="text-align:left; border-bottom:1px solid #ddd; padding:6px;">Alter</th>
-            <th style="text-align:left; border-bottom:1px solid #ddd; padding:6px;">Finanzierung</th>
-            <th style="text-align:left; border-bottom:1px solid #ddd; padding:6px;">Anzahl Tage</th>
-            <th style="text-align:left; border-bottom:1px solid #ddd; padding:6px;">Standort</th>
+            <th style="width: 90px;">Deal-ID</th>
+            <th style="width: 120px;">Abschluss</th>
+            <th style="width: 120px;">Eintritt</th>
+            <th style="width: 120px; text-align:center;">Tage bis Eintritt</th>
+            <th style="width: 120px;">Alter</th>
+            <th style="width: 140px;">Finanzierung</th>
+            <th style="width: 90px; text-align:center;">Plätze</th>
+            <th style="width: 160px;">Standort</th>
           </tr>
         </thead>
 
         <tbody>
           {#each grp as r}
             <tr>
-              <td style="border-bottom:1px solid #f0f0f0; padding:6px;">{r.id}</td>
-              <td style="border-bottom:1px solid #f0f0f0; padding:6px;">{r.abschlussdatum}</td>
-              <td style="border-bottom:1px solid #f0f0f0; padding:6px;">{r.eintrittsdatum}</td>
-              <td style="border-bottom:1px solid #f0f0f0; padding:6px;">{r.tage_bis_eintritt ?? ""}</td>
-              <td style="border-bottom:1px solid #f0f0f0; padding:6px;">{normalizeAlter(r.alter_beim_eintritt)}</td>
-              <td style="border-bottom:1px solid #f0f0f0; padding:6px;">
-                {subventionLabel(r.finanzierung)}
-              </td>
-              <td style="border-bottom:1px solid #f0f0f0; padding:6px;">{r.anzahl_tage ?? ""}</td>
-              <td style="border-bottom:1px solid #f0f0f0; padding:6px;">{r.besichtigungsstandort ?? ""}</td>
+              <td>{r.id}</td>
+              <td>{r.abschlussdatum}</td>
+              <td>{r.eintrittsdatum}</td>
+              <td class="center-num">{r.tage_bis_eintritt ?? ""}</td>
+              <td>{normalizeAlter(r.alter_beim_eintritt)}</td>
+              <td>{finanzierungLabel(r.finanzierung)}</td>
+              <td class="center-num">{plaetze(r.anzahl_tage)}</td>
+              <td>{r.besichtigungsstandort ?? ""}</td>
             </tr>
-
-            {#if r.notitzen_subventionen}
-              <tr>
-                <td colspan="8" style="padding:6px; border-bottom:1px solid #f0f0f0; font-size: 0.95em;">
-                  <strong>Subventions-Notiz:</strong> {r.notitzen_subventionen}
-                </td>
-              </tr>
-            {/if}
           {/each}
         </tbody>
       </table>
