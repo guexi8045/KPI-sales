@@ -9,6 +9,6 @@ bp = Blueprint("zeitbiseintritt", __name__, url_prefix="/api")
 def zeitbiseintritt():
     month = request.args.get("month")
     if not month:
-        return jsonify({"error": "month parameter required, e.g. 2025-12"}), 400
+        return jsonify({"error": "month parameter required, e.g. 2026-02"}), 400
 
     return jsonify(get_zeitbiseintritt(month))
